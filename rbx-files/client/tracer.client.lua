@@ -290,12 +290,11 @@ local function calculateColor(ray: Ray, x, y)
 	return { r = r; g = g; b = b }
 end
 
--- rendering results
+-- # rendering results
 if is_parallel and tonumber(script.Parent.Name) then
 	local Iy = script.Parent.Name
 
 	task.synchronize()
-
 	local line_pixel = ReplicatedStorage.data.pixel:Clone()
 	line_pixel.BackgroundTransparency = 0.1
 	line_pixel.Parent = local_player.PlayerGui.ScreenGui
@@ -312,11 +311,11 @@ if is_parallel and tonumber(script.Parent.Name) then
 			return
 		end
 
-		--picking the given pixel
+		-- # picking the given pixel
 		local ray = camera:ScreenPointToRay(Px + Ix, Py + Iy)
 		local actualRay = new_Ray(ray.Origin, ray.Direction * tracer_data.view_distance)
 
-		--adding to the cache
+		-- # adding to the cache and compressing
 		local output = calculateColor(actualRay, Ix, Iy)
 		output.r = tostring(output.r):sub(1, 5)
 		output.g = tostring(output.g):sub(1, 5)
@@ -327,7 +326,7 @@ if is_parallel and tonumber(script.Parent.Name) then
 	c = RunService.Heartbeat:ConnectParallel(function()
 		task.synchronize()
 
-		-- render without causing major lag
+		-- # render without causing major lag
 		local end_time = tick()+ms_budget
 		while tick()<end_time do render() end
 
@@ -362,10 +361,10 @@ elseif not is_parallel then
 		actor.Parent = script.Parent
 		instances[#instances+1] = actor
 
+		-- # always have as many actors as there are packets allowed
 		if #instances>packets then
 			repeat
 				stepped:Wait()
-
 				for i, v in pairs(instances) do
 					if v.Parent ~= script.Parent then instances[i] = nil end
 				end
@@ -377,10 +376,9 @@ end
 if not is_parallel then
 	function stop()
 
+		local end_time = util.getTime()
+
 		inputs:kill()
-
-		local formattedEndTime = util.getTime()
-
 		server_request({
 			["request_type"] = 3;
 		})
@@ -390,7 +388,7 @@ if not is_parallel then
 		log("time elapsed: "..tostring(tick() - start))
 		log("frame size: X"..Sx.." Y"..Sy)
 		log("start time: "..formatted_start_time)
-		log("end time: "..formattedEndTime)
+		log("end time: "..end_time)
 
 		for i, v in pairs(tracer_data) do
 			log(tostring(i).." = "..tostring(v))
