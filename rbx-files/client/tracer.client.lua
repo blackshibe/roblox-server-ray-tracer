@@ -52,6 +52,7 @@ local scatter = {
 	[materials.Metal] = 10;
 	[materials.SmoothPlastic] = 45;
 	[materials.Plastic] = 80;
+	[materials.Ice] = 20;
 	[materials.Neon] = 0;
 	[materials.Grass] = 90;
 	[materials.Concrete] = 90;
@@ -65,7 +66,6 @@ local scatter = {
 }
 
 local formatted_start_time
-local size = tracer_data.pixel_size
 local wait_line = 0
 local wait_each = 120
 local start = tick()
@@ -165,18 +165,6 @@ local ignore = workspace.ignore
 
 --]]
 
-for i, v in pairs(scatter) do
-	scatter[i] = v*2
-end
-
-local function update(waitMul)
-	wait_line += (1 / Sx)
-	if wait_line >= wait_each * (waitMul or 1) then
-		wait_line = 0
-		stepped:Wait()
-	end
-end
-
 local function getSkyColor(Y)
 	return Color3.fromRGB(sky_r - (Y / 1.5), sky_g - (Y / 1.5), sky_b - (Y / 1.5))
 end
@@ -191,15 +179,25 @@ function calculateColor(ray: Ray)
 
 	local result = workspace:Raycast(ray.Origin, ray.Direction * tracer_data.view_distance, raycast_params) or {}
 	local skyColor = getSkyColor((result.Position or ray.Origin).Y)
-	local normal = (result.Normal or Vector3.new())*0.01
+
+	local normal = (result.Normal or Vector3.new())*0.1
 	local position = (result.Position or (ray.Origin+ray.Direction)) + normal
 	local part = result.Instance
+	local material = result.Material
 
 	local r
 	local g
 	local b
+
+	local shadow_r = 0
+	local shadow_g = 0
+	local shadow_b = 0
+	local shadow_average_sample_size = 1
+
 	local samples = tracer_data.samples
 	local bounces = tracer_data.bounces
+	local shading_enabled = tracer_data.shading_enabled
+	local sky_strength = tracer_data.sky_strength
 
 	if part then
 		r = part.Color.R
@@ -207,7 +205,8 @@ function calculateColor(ray: Ray)
 		b = part.Color.B
 
 		if part.Material == materials.Neon then
-			return { r = r; g = g; b = b  }
+			local strength = part.strength.Value
+			return { r = r*strength; g = g*strength; b = b*strength  }
 		end
 
 		if part.Transparency == 1 then
@@ -218,11 +217,58 @@ function calculateColor(ray: Ray)
 		return { r = skyColor.r; g = skyColor.g; b = skyColor.b; }
 	end
 
+	if shading_enabled then
+		for i = 1, samples do
+
+			local mat_factor = scatter[material]
+			if not mat_factor then
+				warn(material)
+				mat_factor = 90
+			end
+
+			mat_factor = math.rad(mat_factor)
+			local shadow_position = CFrame.new(position, position+normal)
+			shadow_position *= CFrame.Angles(
+				random:NextNumber(-mat_factor, mat_factor),
+				random:NextNumber(-mat_factor, mat_factor),
+				0
+			)
+
+			-- # shadow ray
+			local shade_result = workspace:Raycast(shadow_position.Position, shadow_position.LookVector * tracer_data.view_distance, raycast_params) or {}
+			local shade_instance = shade_result.Instance
+
+			-- # part
+			if shade_instance then
+
+				if shade_instance.Parent == lights then
+					local strength = shade_instance.strength.Value
+					local color = shade_instance.Color
+
+					shadow_average_sample_size += 1
+					shadow_r = color.R*strength
+					shadow_g = color.G*strength
+					shadow_b = color.B*strength
+				end
+			-- # sky
+			else
+				shadow_average_sample_size += 1
+				shadow_r = (sky_r/255)*sky_strength
+				shadow_g = (sky_g/255)*sky_strength
+				shadow_b = (sky_b/255)*sky_strength
+			end
+		end
+
+		r *= (shadow_r/shadow_average_sample_size)
+		g *= (shadow_g/shadow_average_sample_size)
+		b *= (shadow_b/shadow_average_sample_size)
+	end
+
 	return { r = r; g = g; b = b; }
 end
 
 -- rendering results
-if is_parallel and tonumber(script.Parent.Name)%size==0 then
+if is_parallel and tonumber(script.Parent.Name) then
 	local Iy = script.Parent.Name
 
 	task.synchronize()
@@ -254,7 +300,7 @@ if is_parallel and tonumber(script.Parent.Name)%size==0 then
 	c = RunService.Heartbeat:ConnectParallel(function()
 		task.synchronize()
 
-		local end_time = tick()+0.01*0.1
+		local end_time = tick()+0.01*0.5
 		while tick()<end_time do render() end
 
 		line_pixel.Position = UDim2.fromOffset(Px, Py+Iy)
@@ -271,13 +317,11 @@ if is_parallel and tonumber(script.Parent.Name)%size==0 then
 		end
 	end
 
-	for i = 0, size-1 do
-		server_request({
-			["request_type"] = 2;
-			["y_row"] = Iy+i;
-			["pixel_data"] = HttpService:JSONEncode(output_pixels);
-		})
-	end
+	server_request({
+		["request_type"] = 2;
+		["y_row"] = Iy+1;
+		["pixel_data"] = HttpService:JSONEncode(output_pixels);
+	})
 
 	line_pixel.BackgroundTransparency = 0.7
 elseif not is_parallel then
@@ -294,7 +338,7 @@ elseif not is_parallel then
 		if #instances>packets then
 			repeat
 				stepped:Wait()
-	
+
 				for i, v in pairs(instances) do
 					if v.Parent ~= script.Parent then instances[i] = nil print('removed') end
 				end
@@ -307,6 +351,8 @@ end
 
 if not is_parallel then
 	function stop()
+
+		inputs:kill()
 
 		local formattedEndTime = util.getTime()
 

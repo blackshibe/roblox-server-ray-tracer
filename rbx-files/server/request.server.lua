@@ -2,9 +2,10 @@ local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local end_request_batch_size = workspace.data.batch_size.Value
+
 local sending = false
 local end_request_data = {}
-local end_request_batch_size = 16;
 local serializing = false
 local url = "http://localhost:5000"
 local data_types = {
@@ -13,7 +14,6 @@ local data_types = {
     "writePixelRow",
     "writeToImage"
 }
-
 
 local function receiveRequest(player, fields)
 
@@ -37,18 +37,23 @@ local function receiveRequest(player, fields)
 		serializing = true
 
 		local end_request_batch_data = {}
-		for i = 1, #end_request_data do
+		local start = 1
+
+		for i = 1, #end_request_data, 1 do
 
 			end_request_batch_data[#end_request_batch_data+1] = end_request_data[i]
-			if i%end_request_batch_size == 0 or (#end_request_data-i) <= end_request_batch_size then
-				print("sending", i)
-				print(end_request_batch_data)
-				receiveRequest(nil, {	
+
+			if i%end_request_batch_size == 0 or (#end_request_data-i) < end_request_batch_size then
+
+				receiveRequest(nil, {
 					["request_type"] = 2;
-					["y_row"] = 1;
+					["y_row"] = i;
 					["pixel_data"] = HttpService:JSONEncode(end_request_batch_data);
 				})
+
+				warn(start.."-"..i)
 				end_request_batch_data = {}
+				start = i
 			end
 		end
 	end
@@ -61,10 +66,9 @@ local function receiveRequest(player, fields)
 			HttpService:UrlEncode(v)
 		)
 	end
-
-
 	data = data:sub(2) -- Remove the first &
 
+	-- TODO: catch errors
 	print(HttpService:PostAsync(url, data, Enum.HttpContentType.ApplicationUrlEncoded, false))
 
 	sending = false

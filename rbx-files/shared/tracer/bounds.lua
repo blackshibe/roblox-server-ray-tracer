@@ -5,6 +5,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local data = require(ReplicatedStorage.shared.tracer.data)
 local log = require(ReplicatedStorage.shared.gui.log)
 local status = require(ReplicatedStorage.shared.gui.status)
 
@@ -22,6 +23,17 @@ function frame:pick(group)
 	local x2 = 0
 	local y2 = 0
 
+	local snapped = false
+
+	group:bindActionBegan("snapSize", nil, "LeftControl", true, function()
+		snapped = true
+	end)
+
+	group:bindActionEnded("snapSizeEnd", nil, "LeftControl", true, function()
+		snapped = false
+	end)
+
+
 	group:bindActionBegan("select", "MouseButton1", nil, true, function()
 		if current_boundary == 1 then
 
@@ -33,6 +45,13 @@ function frame:pick(group)
 			while current_boundary == 2 do
 				x2 = mouse.X
 				y2 = mouse.Y
+
+				if snapped then
+					x1 -= x1%data.batch_size
+					y1 -= y1%data.batch_size
+					x2 -= x2%data.batch_size
+					y2 -= y2%data.batch_size
+				end
 
 				bounds_frame.Position = UDim2.new(0,x1,0,y1)
 				bounds_frame.Size = UDim2.new(0,x2 - x1,0,y2- y1)
@@ -61,7 +80,7 @@ function frame:pick(group)
 
 		else
 			current_boundary += 1
-			group:unbindAction("select")
+			group:clear()
 		end
 	end)
 

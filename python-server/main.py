@@ -26,6 +26,8 @@ currentImage = Image.new('RGB', (0, 0) )
 receivedLines = 0
 imageSizeY = 0
 globalMessageLoop = 0
+img_size_x = 0
+img_size_y = 0
 
 import asyncio
 import time
@@ -36,6 +38,9 @@ def sendCommand():
 	print(request.form['request_type'])
 	customRequestType = serverDataTypes[ int(request.form['request_type']) ]
 	print("Received request:", customRequestType)
+
+	global img_size_x
+	global img_size_y
 
 	if customRequestType == "clearServer":
 
@@ -48,22 +53,35 @@ def sendCommand():
 		print("size_x:",request.form['image_size_x'])
 		print("size_y:",request.form['image_size_y'])
 
-		global currentImage 
+		global currentImage
+
+		img_size_x = int( request.form['image_size_x'] )
+		img_size_y = int( request.form['image_size_y'] )
+
 		currentImage = Image.new('RGB', ( int( request.form['image_size_x'] ), int( request.form['image_size_y'] ) ) )
 
 	if customRequestType == "writePixelRow":
 
 		decodedTable = json.loads(request.form["pixel_data"], parse_float=Decimal)
 		color_i = 1
+		y_row = 0
+
 		print("Processing row", int(request.form["y_row"]))
 
 		for decodedImageData in decodedTable:
-			for key in decodedImageData:
-				print(key)
+			decodedImageDataTable = json.loads(decodedImageData, parse_float=Decimal)
+			y_row = y_row + 1
+			color_i = 0
+			for key in decodedImageDataTable:
 				# haha yes type converter go brrr
-				currentImage.putpixel( ( int(color_i) - 1, int(request.form["y_row"] ) - 1), (int(float(key["r"]) * 255), int(float(key["g"]) * 255), int(float(key["b"]) * 255) ) ) 
+				x = int(color_i) - 1
+				y = int(request.form["y_row"]) + y_row - 1
 				color_i = color_i + 1   
-			
+
+				if x < img_size_x:
+					if y < img_size_y:
+						currentImage.putpixel( (x, y), (int(float(key["r"]) * 255), int(float(key["g"]) * 255), int(float(key["b"]) * 255)) ) 
+		
 	if customRequestType == "writeToImage":
 
 		imageName = time.strftime("%Y %m %d - %H %M %S") + ".png"

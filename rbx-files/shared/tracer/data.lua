@@ -8,7 +8,9 @@ local data_instances = {
 	"samples";
 	"view_distance";
 	"sky_color";
-	"pixel_size"
+	"batch_size";
+	"shading_enabled";
+	"sky_strength"
 }
 
 for _, name in pairs(data_instances) do
