@@ -36,8 +36,8 @@ local random = Random.new()
 local inputs
 
 --> lower to decrease chance of crashes
-local packets = 12
-local ms_budget = 1/packets
+local target_actors = 12
+local ms_budget = 1/target_actors
 
 if not is_parallel then
 	bounds = require(ReplicatedStorage.shared.tracer.bounds)
@@ -211,9 +211,9 @@ local function calculateColor(ray: Ray, x, y)
 			return calculateColor(newScreenPointRay, x, y)
 		end
 	else
-		r = sky_r/255
-		g = sky_g/255
-		b = sky_b/255
+		r = skyColor.r
+		g = skyColor.g
+		b = skyColor.b
 	end
 
 	-- # shading
@@ -223,7 +223,7 @@ local function calculateColor(ray: Ray, x, y)
 		local shadow_g = 0
 		local shadow_b = 0
 		local shadow_average_sample_size = 1
-		local lStrength = 0
+		local light_strength = 0
 
 		for _ = 1, bounces do
 			for _ = 1,samples do
@@ -240,14 +240,14 @@ local function calculateColor(ray: Ray, x, y)
 						shadow_r += (f_part.Color.R)
 						shadow_g += (f_part.Color.G)
 						shadow_b += (f_part.Color.B)
-						lStrength += f_part.strength.Value
+						light_strength += f_part.strength.Value
 					end
 				else
 					shadow_r += sky_r/255
 					shadow_g += sky_g/255
 					shadow_b += sky_b/255
 					shadow_average_sample_size = shadow_average_sample_size + 1
-					lStrength += 1
+					light_strength += tracer_data.sky_strength
 				end
 			end
 		end
@@ -272,9 +272,9 @@ local function calculateColor(ray: Ray, x, y)
 			end
 		end
 
-		r *= (((lStrength) / samples) / bounces) + (reflection_r * ref)
-		g *= (((lStrength) / samples) / bounces) + (reflection_g * ref)
-		b *= (((lStrength) / samples) / bounces) + (reflection_b * ref)
+		r *= (((light_strength) / samples) / bounces) + (reflection_r * ref)
+		g *= (((light_strength) / samples) / bounces) + (reflection_g * ref)
+		b *= (((light_strength) / samples) / bounces) + (reflection_b * ref)
 	end
 
 	-- # fog
@@ -361,14 +361,14 @@ elseif not is_parallel then
 		actor.Parent = script.Parent
 		instances[#instances+1] = actor
 
-		-- # always have as many actors as there are packets allowed
-		if #instances>packets then
+		-- # always have as many actors as there are target_actors allowed
+		if #instances>target_actors then
 			repeat
 				stepped:Wait()
 				for i, v in pairs(instances) do
 					if v.Parent ~= script.Parent then instances[i] = nil end
 				end
-			until #instances<packets
+			until #instances<target_actors
 		end
 	end
 end
