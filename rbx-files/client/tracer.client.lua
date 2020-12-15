@@ -73,7 +73,7 @@ local sky_b = sky_color.B * 255
 
 --> lower to decrease chance of crashes
 local packets = 12
-local ms_budget = 0.5/packets
+local ms_budget = 1/packets
 local bounds_frame
 
 local raycast_params = RaycastParams.new()
@@ -170,19 +170,20 @@ local function getSkyColor(Y)
 	return Color3.fromRGB(sky_r - (Y / 1.5), sky_g - (Y / 1.5), sky_b - (Y / 1.5))
 end
 
-function getReflectedRay(direction, normal, pos)
+local function getReflectedRay(direction, normal, pos)
 	local reflectedNormal = direction - (2 * direction:Dot(normal) * normal)
 	local refRay = new_Ray(pos, reflectedNormal * 1000)
 	return refRay, reflectedNormal
 end
 
-function calculateColor(ray: Ray)
+local function calculateColor(ray: Ray, x, y)
 
+	local screen_y_map = util.map(y, 0, Sy, 0, 1)
 	local result = workspace:Raycast(ray.Origin, ray.Direction * tracer_data.view_distance, raycast_params) or {}
-	local skyColor = getSkyColor((result.Position or ray.Origin).Y)
+	local skyColor = getSkyColor((result.Position or ray.Origin).Y):Lerp(tracer_data.fog_color, screen_y_map)
 
-	local normal = (result.Normal or Vector3.new())*0.1
-	local position = (result.Position or (ray.Origin+ray.Direction)) + normal
+	local normal = (result.Normal or Vector3.new())
+	local position = (result.Position or (ray.Origin+ray.Direction)) + normal*0.01
 	local part = result.Instance
 	local material = result.Material
 
@@ -193,8 +194,8 @@ function calculateColor(ray: Ray)
 	local samples = tracer_data.samples
 	local bounces = tracer_data.bounces
 	local shading_enabled = tracer_data.shading_enabled
-	local sky_strength = tracer_data.sky_strength
 
+	-- # albedo
 	if part then
 		r = part.Color.R
 		g = part.Color.G
@@ -207,13 +208,16 @@ function calculateColor(ray: Ray)
 
 		if part.Transparency == 1 then
 			local newScreenPointRay = new_Ray(position - (normal*0.1), ray.Direction * tracer_data.view_distance)
-			return calculateColor(newScreenPointRay)
+			return calculateColor(newScreenPointRay, x, y)
 		end
 	else
-		return { r = skyColor.r; g = skyColor.g; b = skyColor.b; }
+		r = sky_r/255
+		g = sky_g/255
+		b = sky_b/255
 	end
 
-	if shading_enabled then
+	-- # shading
+	if shading_enabled and part then
 
 		local shadow_r = 0
 		local shadow_g = 0
@@ -226,18 +230,19 @@ function calculateColor(ray: Ray)
 
 				local rot = math.rad(90)
 				local direction = CFrame.fromOrientation(random:NextNumber(-rot, rot),random:NextNumber(-rot, rot),random:NextNumber(-rot, rot)).LookVector * 100
-				local ray = Ray.new(position, direction)
 
-				local fPart, fPoint, fNormal = workspace:FindPartOnRay(ray, ignore)
-				fPoint = fPoint + (fNormal / 100)
+				local f_result = workspace:Raycast(position, direction, raycast_params) or {}
+				local f_normal = (f_result.Normal or Vector3.new())
+				local f_position = (f_result.Position or (position+direction)) + normal*0.01
+				local f_part = f_result.Instance
 
-				if fPart then
-					if fPart.Parent == lights then
+				if f_part then
+					if f_part.Parent == lights then
 						shadow_average_sample_size = shadow_average_sample_size + 1
-						shadow_r += (fPart.Color.R)
-						shadow_g += (fPart.Color.G)
-						shadow_b += (fPart.Color.B)
-						lStrength += fPart.strength.Value
+						shadow_r += (f_part.Color.R)
+						shadow_g += (f_part.Color.G)
+						shadow_b += (f_part.Color.B)
+						lStrength += f_part.strength.Value
 					end
 				else
 					shadow_r += sky_r/255
@@ -249,9 +254,9 @@ function calculateColor(ray: Ray)
 			end
 		end
 
-		r += (shadow_r / shadow_average_sample_size)
-		g += (shadow_g / shadow_average_sample_size)
-		b += (shadow_b / shadow_average_sample_size)
+		r *= (shadow_r / shadow_average_sample_size)
+		g *= (shadow_g / shadow_average_sample_size)
+		b *= (shadow_b / shadow_average_sample_size)
 
 		local refR = 1
 		local refG = 1
@@ -260,8 +265,8 @@ function calculateColor(ray: Ray)
 		if part then
 			ref = part.Reflectance
 			if part.Reflectance ~= 0 then
-				local rRay = getReflectedRay(ray.Direction, normal, position)
-				local color = calculateColor(rRay)
+				local reflect_ray = getReflectedRay(ray.Direction, normal, position)
+				local color = calculateColor(reflect_ray, x, y)
 				refR = color.r
 				refG = color.g
 				refB = color.b
@@ -271,8 +276,17 @@ function calculateColor(ray: Ray)
 		r *= (((lStrength) / samples) / bounces) + (refR * ref)
 		g *= (((lStrength) / samples) / bounces) + (refG * ref)
 		b *= (((lStrength) / samples) / bounces) + (refB * ref)
-
 	end
+
+	-- # fog
+	local distance_to_camera = (position - workspace.Camera.CFrame.Position).Magnitude
+	local fog_fade_out = tracer_data.fog_fade_out
+	local fog_fade_in = tracer_data.fog_fade_in
+
+	local factor = math.clamp(util.map(distance_to_camera, fog_fade_out, fog_fade_in, 0, 1), 0, 1)
+	r = util.lerp(r, tracer_data.fog_color.r, factor)
+	g = util.lerp(g, tracer_data.fog_color.g, factor)
+	b = util.lerp(b, tracer_data.fog_color.b, factor)
 
 	return { r = r; g = g; b = b }
 end
@@ -304,10 +318,10 @@ if is_parallel and tonumber(script.Parent.Name) then
 		local actualRay = new_Ray(ray.Origin, ray.Direction * tracer_data.view_distance)
 
 		--adding to the cache
-		local output = calculateColor(actualRay)
+		local output = calculateColor(actualRay, Ix, Iy)
 		output.r = tostring(output.r):sub(1, 5)
-		output.g = tostring(output.r):sub(1, 5)
-		output.b = tostring(output.r):sub(1, 5)
+		output.g = tostring(output.g):sub(1, 5)
+		output.b = tostring(output.b):sub(1, 5)
 		output_pixels[Ix] = output
 	end
 
@@ -360,7 +374,6 @@ elseif not is_parallel then
 		end
 	end
 end
-
 
 if not is_parallel then
 	function stop()

@@ -6,11 +6,17 @@ local data_instances = {
 	"fov";
 	"bounces";
 	"samples";
-	"view_distance";
-	"sky_color";
 	"batch_size";
+
+	"view_distance";
 	"shading_enabled";
-	"sky_strength"
+
+	"sky_strength";
+	"sky_color";
+
+	"fog_color";
+	"fog_fade_in";
+	"fog_fade_out";
 }
 
 for _, name in pairs(data_instances) do
