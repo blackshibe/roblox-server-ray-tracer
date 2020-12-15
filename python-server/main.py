@@ -59,7 +59,7 @@ def sendCommand():
 
 		for decodedImageData in decodedTable:
 			for key in decodedImageData:
-				print(color_i)
+				print(key)
 				# haha yes type converter go brrr
 				currentImage.putpixel( ( int(color_i) - 1, int(request.form["y_row"] ) - 1), (int(float(key["r"]) * 255), int(float(key["g"]) * 255), int(float(key["b"]) * 255) ) ) 
 				color_i = color_i + 1   

@@ -15,7 +15,7 @@ local drawersWaiting = {}
 console.Parent = screen_gui
 screen_gui.Parent = local_player.PlayerGui
 
---- what the fuck is this function
+--- what the jf9we9j-fewfj9-wefj-ewf is this function
 function printToConsole(message)
 
 	local wait_for
