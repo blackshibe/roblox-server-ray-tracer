@@ -1,6 +1,9 @@
 workspace:WaitForChild("data")
 
 local data = {}
+
+--- defines what tree_data will contain
+--- appropiate value must be findable inside workspace.data
 local data_instances = {
 	"preset";
 	"fov";

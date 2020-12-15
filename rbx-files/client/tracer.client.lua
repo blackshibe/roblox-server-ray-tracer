@@ -35,6 +35,10 @@ local mouse = local_player:GetMouse()
 local random = Random.new()
 local inputs
 
+--> lower to decrease chance of crashes
+local packets = 12
+local ms_budget = 1/packets
+
 if not is_parallel then
 	bounds = require(ReplicatedStorage.shared.tracer.bounds)
 	log = require(ReplicatedStorage.shared.gui.log)
@@ -66,15 +70,11 @@ local scatter = {
 }
 
 local formatted_start_time
+local bounds_frame
 local start = tick()
 local sky_r = sky_color.R * 255
 local sky_g = sky_color.G * 255
 local sky_b = sky_color.B * 255
-
---> lower to decrease chance of crashes
-local packets = 12
-local ms_budget = 1/packets
-local bounds_frame
 
 local raycast_params = RaycastParams.new()
 raycast_params.FilterDescendantsInstances = { workspace.ignore }
@@ -232,8 +232,6 @@ local function calculateColor(ray: Ray, x, y)
 				local direction = CFrame.fromOrientation(random:NextNumber(-rot, rot),random:NextNumber(-rot, rot),random:NextNumber(-rot, rot)).LookVector * 100
 
 				local f_result = workspace:Raycast(position, direction, raycast_params) or {}
-				local f_normal = (f_result.Normal or Vector3.new())
-				local f_position = (f_result.Position or (position+direction)) + normal*0.01
 				local f_part = f_result.Instance
 
 				if f_part then
@@ -258,24 +256,25 @@ local function calculateColor(ray: Ray, x, y)
 		g *= (shadow_g / shadow_average_sample_size)
 		b *= (shadow_b / shadow_average_sample_size)
 
-		local refR = 1
-		local refG = 1
-		local refB = 1
+		-- TODO: this but transparency
+		local reflection_r = 1
+		local reflection_g = 1
+		local reflection_b = 1
 		local ref = 0
 		if part then
 			ref = part.Reflectance
 			if part.Reflectance ~= 0 then
 				local reflect_ray = getReflectedRay(ray.Direction, normal, position)
 				local color = calculateColor(reflect_ray, x, y)
-				refR = color.r
-				refG = color.g
-				refB = color.b
+				reflection_r = color.r
+				reflection_g = color.g
+				reflection_b = color.b
 			end
 		end
 
-		r *= (((lStrength) / samples) / bounces) + (refR * ref)
-		g *= (((lStrength) / samples) / bounces) + (refG * ref)
-		b *= (((lStrength) / samples) / bounces) + (refB * ref)
+		r *= (((lStrength) / samples) / bounces) + (reflection_r * ref)
+		g *= (((lStrength) / samples) / bounces) + (reflection_g * ref)
+		b *= (((lStrength) / samples) / bounces) + (reflection_b * ref)
 	end
 
 	-- # fog

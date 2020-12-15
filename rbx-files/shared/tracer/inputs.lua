@@ -1,4 +1,3 @@
----@class inputService
 local moduleData = {}
 local UserInputService = game:GetService("UserInputService")
 
@@ -8,7 +7,7 @@ function moduleData:getGroup(groupName)
 end
 
 function moduleData:add_group(groupName)
-	
+
 	local group
 	local userInputEvent
 	local userInputEvent2

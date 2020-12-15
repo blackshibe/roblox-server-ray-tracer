@@ -39,6 +39,7 @@ def sendCommand():
 	customRequestType = serverDataTypes[ int(request.form['request_type']) ]
 	print("Received request:", customRequestType)
 
+	# top 10 reasons why python is bad
 	global img_size_x
 	global img_size_y
 
@@ -73,7 +74,8 @@ def sendCommand():
 			y_row = y_row + 1
 			color_i = 0
 			for key in decodedImageDataTable:
-				# haha yes type converter go brrr
+
+				# this crap
 				x = int(color_i) - 1
 				y = int(request.form["y_row"]) + y_row - 1
 				color_i = color_i + 1   
