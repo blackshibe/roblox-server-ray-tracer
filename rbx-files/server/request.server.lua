@@ -69,7 +69,14 @@ local function receiveRequest(player, fields)
 	data = data:sub(2) -- Remove the first &
 
 	-- TODO: catch errors
-	print(HttpService:PostAsync(url, data, Enum.HttpContentType.ApplicationUrlEncoded, false))
+	local success, fail = pcall(function()
+		HttpService:PostAsync(url, data, Enum.HttpContentType.ApplicationUrlEncoded, false)
+	end)
+
+	if not success and fail:find("1024") then
+		end_request_batch_size /= 2
+		warn(fail)
+	end
 
 	sending = false
 end

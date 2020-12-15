@@ -66,13 +66,14 @@ local scatter = {
 }
 
 local formatted_start_time
-local wait_line = 0
-local wait_each = 120
 local start = tick()
 local sky_r = sky_color.R * 255
 local sky_g = sky_color.G * 255
 local sky_b = sky_color.B * 255
 
+--> lower to decrease chance of crashes
+local packets = 12
+local ms_budget = 0.5/packets
 local bounds_frame
 
 local raycast_params = RaycastParams.new()
@@ -189,11 +190,6 @@ function calculateColor(ray: Ray)
 	local g
 	local b
 
-	local shadow_r = 0
-	local shadow_g = 0
-	local shadow_b = 0
-	local shadow_average_sample_size = 1
-
 	local samples = tracer_data.samples
 	local bounces = tracer_data.bounces
 	local shading_enabled = tracer_data.shading_enabled
@@ -218,53 +214,67 @@ function calculateColor(ray: Ray)
 	end
 
 	if shading_enabled then
-		for i = 1, samples do
 
-			local mat_factor = scatter[material]
-			if not mat_factor then
-				warn(material)
-				mat_factor = 90
-			end
+		local shadow_r = 0
+		local shadow_g = 0
+		local shadow_b = 0
+		local shadow_average_sample_size = 1
+		local lStrength = 0
 
-			mat_factor = math.rad(mat_factor)
-			local shadow_position = CFrame.new(position, position+normal)
-			shadow_position *= CFrame.Angles(
-				random:NextNumber(-mat_factor, mat_factor),
-				random:NextNumber(-mat_factor, mat_factor),
-				0
-			)
+		for _ = 1, bounces do
+			for _ = 1,samples do
 
-			-- # shadow ray
-			local shade_result = workspace:Raycast(shadow_position.Position, shadow_position.LookVector * tracer_data.view_distance, raycast_params) or {}
-			local shade_instance = shade_result.Instance
+				local rot = math.rad(90)
+				local direction = CFrame.fromOrientation(random:NextNumber(-rot, rot),random:NextNumber(-rot, rot),random:NextNumber(-rot, rot)).LookVector * 100
+				local ray = Ray.new(position, direction)
 
-			-- # part
-			if shade_instance then
+				local fPart, fPoint, fNormal = workspace:FindPartOnRay(ray, ignore)
+				fPoint = fPoint + (fNormal / 100)
 
-				if shade_instance.Parent == lights then
-					local strength = shade_instance.strength.Value
-					local color = shade_instance.Color
-
-					shadow_average_sample_size += 1
-					shadow_r = color.R*strength
-					shadow_g = color.G*strength
-					shadow_b = color.B*strength
+				if fPart then
+					if fPart.Parent == lights then
+						shadow_average_sample_size = shadow_average_sample_size + 1
+						shadow_r += (fPart.Color.R)
+						shadow_g += (fPart.Color.G)
+						shadow_b += (fPart.Color.B)
+						lStrength += fPart.strength.Value
+					end
+				else
+					shadow_r += sky_r/255
+					shadow_g += sky_g/255
+					shadow_b += sky_b/255
+					shadow_average_sample_size = shadow_average_sample_size + 1
+					lStrength += 1
 				end
-			-- # sky
-			else
-				shadow_average_sample_size += 1
-				shadow_r = (sky_r/255)*sky_strength
-				shadow_g = (sky_g/255)*sky_strength
-				shadow_b = (sky_b/255)*sky_strength
 			end
 		end
 
-		r *= (shadow_r/shadow_average_sample_size)
-		g *= (shadow_g/shadow_average_sample_size)
-		b *= (shadow_b/shadow_average_sample_size)
+		r += (shadow_r / shadow_average_sample_size)
+		g += (shadow_g / shadow_average_sample_size)
+		b += (shadow_b / shadow_average_sample_size)
+
+		local refR = 1
+		local refG = 1
+		local refB = 1
+		local ref = 0
+		if part then
+			ref = part.Reflectance
+			if part.Reflectance ~= 0 then
+				local rRay = getReflectedRay(ray.Direction, normal, position)
+				local color = calculateColor(rRay)
+				refR = color.r
+				refG = color.g
+				refB = color.b
+			end
+		end
+
+		r *= (((lStrength) / samples) / bounces) + (refR * ref)
+		g *= (((lStrength) / samples) / bounces) + (refG * ref)
+		b *= (((lStrength) / samples) / bounces) + (refB * ref)
+
 	end
 
-	return { r = r; g = g; b = b; }
+	return { r = r; g = g; b = b }
 end
 
 -- rendering results
@@ -294,13 +304,18 @@ if is_parallel and tonumber(script.Parent.Name) then
 		local actualRay = new_Ray(ray.Origin, ray.Direction * tracer_data.view_distance)
 
 		--adding to the cache
-		output_pixels[Ix] = calculateColor(actualRay)
+		local output = calculateColor(actualRay)
+		output.r = tostring(output.r):sub(1, 5)
+		output.g = tostring(output.r):sub(1, 5)
+		output.b = tostring(output.r):sub(1, 5)
+		output_pixels[Ix] = output
 	end
 
 	c = RunService.Heartbeat:ConnectParallel(function()
 		task.synchronize()
 
-		local end_time = tick()+0.01*0.5
+		-- render without causing major lag
+		local end_time = tick()+ms_budget
 		while tick()<end_time do render() end
 
 		line_pixel.Position = UDim2.fromOffset(Px, Py+Iy)
@@ -325,7 +340,6 @@ if is_parallel and tonumber(script.Parent.Name) then
 
 	line_pixel.BackgroundTransparency = 0.7
 elseif not is_parallel then
-	local packets = 64
 	local instances = {}
 	for Iy = 1, Sy do
 		local actor = Instance.new("Actor")
@@ -340,9 +354,8 @@ elseif not is_parallel then
 				stepped:Wait()
 
 				for i, v in pairs(instances) do
-					if v.Parent ~= script.Parent then instances[i] = nil print('removed') end
+					if v.Parent ~= script.Parent then instances[i] = nil end
 				end
-				print("")
 			until #instances<packets
 		end
 	end
