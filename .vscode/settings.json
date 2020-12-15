@@ -1,0 +1,11 @@
+{
+	"Lua.diagnostics.ignore": [
+		"y",
+		"g",
+		"b",
+		"r"
+	],
+	"Lua.diagnostics.globals": [
+		"task"
+	]
+}

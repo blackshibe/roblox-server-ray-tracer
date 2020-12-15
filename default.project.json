@@ -1,0 +1,34 @@
+{
+  "name": "roblox.ray-tracer-parallel",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+
+      "shared": {
+        "$path": "rbx-files/shared"
+      }
+    },
+
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+
+      "server": {
+        "$path": "rbx-files/server"
+      }
+	},
+	
+    "StarterPlayer": {
+		"$className": "StarterPlayer",
+		"StarterPlayerScripts": {
+		
+			"$className": "StarterPlayerScripts",
+
+			"client": {
+				"$path": "rbx-files/client"
+			}
+		}		
+	}
+  }
+}
