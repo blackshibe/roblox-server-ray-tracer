@@ -2,12 +2,9 @@ local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local end_request_batch_size = workspace.data.batch_size.Value
-
 local sending = false
 local end_request_data = {}
 local serializing = false
-local url = "http://localhost:5000"
 local data_types = {
     "clearServer",
     "init",
@@ -17,9 +14,12 @@ local data_types = {
 
 local function receiveRequest(player, fields)
 
+	local end_request_batch_size = workspace.data.batch_size.Value
+	local url = "http://localhost:5000"
+	local data = ""
+
 	while sending do RunService.Heartbeat:Wait() end
 	sending = true
-	local data = ""
 
 	-- # write pixel request
 	if fields.request_type == 2 and not serializing then
@@ -32,7 +32,6 @@ local function receiveRequest(player, fields)
 	if fields.request_type == 3 then
 
 		-- # send remaining pixels
-		warn("sending")
 		sending = false
 		serializing = true
 
@@ -58,7 +57,6 @@ local function receiveRequest(player, fields)
 		end
 	end
 
-	warn("sending: ".. data_types[fields["request_type"] + 1])
 
 	for k, v in pairs(fields) do
 		data = data .. ("&%s=%s"):format(
@@ -68,15 +66,20 @@ local function receiveRequest(player, fields)
 	end
 	data = data:sub(2) -- Remove the first &
 
-	-- TODO: catch errors
-	local success, fail = pcall(function()
-		HttpService:PostAsync(url, data, Enum.HttpContentType.ApplicationUrlEncoded, false)
+	spawn(function()
+		warn("sending: ".. data_types[fields["request_type"] + 1])
+		local success, fail = pcall(function()
+			HttpService:PostAsync(url, data, Enum.HttpContentType.ApplicationUrlEncoded, false)
+		end)
+
+		if not success and fail:find("1024") then
+			end_request_batch_size /= 2
+			warn(fail)
+		end
 	end)
 
-	if not success and fail:find("1024") then
-		end_request_batch_size /= 2
-		warn(fail)
-	end
+
+
 
 	sending = false
 end

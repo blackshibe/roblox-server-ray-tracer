@@ -14,30 +14,10 @@ local is_parallel = script.Parent:IsA("Actor")
 local tracer_data: tracer_data = require(ReplicatedStorage.shared.tracer.data)
 local input_module = require(ReplicatedStorage.shared.tracer.inputs)
 local util = require(ReplicatedStorage.shared.tracer.util)
-
 local bounds
 local log
 local status
-
--- optimization
-local stepped = RunService.Stepped
-local floor = math.floor
-local new_Ray = Ray.new
-local materials = Enum.Material
-local sky_color = tracer_data.sky_color
-local new_udim2 = UDim2.new
-local server_request = util.request
-
--- constants
-local local_player = Players.LocalPlayer
-local camera = workspace.Camera
-local mouse = local_player:GetMouse()
-local random = Random.new()
 local inputs
-
---> lower to decrease chance of crashes
-local target_actors = 12
-local ms_budget = 1/target_actors
 
 if not is_parallel then
 	bounds = require(ReplicatedStorage.shared.tracer.bounds)
@@ -49,26 +29,24 @@ else
 	status = function() end
 end
 
-local output_pixels = {}
-local scatter = {
-	[materials.ForceField] = 0;
-	[materials.Glass] = 0;
-	[materials.Metal] = 10;
-	[materials.SmoothPlastic] = 45;
-	[materials.Plastic] = 80;
-	[materials.Ice] = 20;
-	[materials.Neon] = 0;
-	[materials.Grass] = 90;
-	[materials.Concrete] = 90;
-	[materials.Slate] = 60;
-	[materials.Fabric] = 360;
-	[materials.Wood] = 180;
-	[materials.WoodPlanks] = 180;
-	[materials.Brick] = 180;
-	[materials.DiamondPlate] = 30;
-	[materials.Cobblestone] = 120;
-}
+-- optimization
+local stepped = RunService.Stepped
+local materials = Enum.Material
+local sky_color = tracer_data.sky_color
+local server_request = util.request
 
+-- constants
+local local_player = Players.LocalPlayer
+local camera = workspace.Camera
+local mouse = local_player:GetMouse()
+local random = Random.new()
+
+--> lower to decrease chance of crashes
+local target_actors = 256
+local ms_budget = 1/target_actors
+local use_ms_budget = false -- slower but more stable rendering
+
+local output_pixels = {}
 local formatted_start_time
 local bounds_frame
 local start = tick()
@@ -172,7 +150,7 @@ end
 
 local function getReflectedRay(direction, normal, pos)
 	local reflectedNormal = direction - (2 * direction:Dot(normal) * normal)
-	local refRay = new_Ray(pos, reflectedNormal * 1000)
+	local refRay = Ray.new(pos, reflectedNormal * 1000)
 	return refRay, reflectedNormal
 end
 
@@ -190,6 +168,12 @@ local function calculateColor(ray: Ray, x, y)
 	local r
 	local g
 	local b
+	local reflection_r = 1
+	local reflection_g = 1
+	local reflection_b = 1
+	local transp_r = 1
+	local transp_g = 1
+	local transp_b = 1
 
 	local samples = tracer_data.samples
 	local bounces = tracer_data.bounces
@@ -205,26 +189,47 @@ local function calculateColor(ray: Ray, x, y)
 			local strength = part.strength.Value
 			return { r = r*strength; g = g*strength; b = b*strength  }
 		end
-
-		if part.Transparency == 1 then
-			local newScreenPointRay = new_Ray(position - (normal*0.1), ray.Direction * tracer_data.view_distance)
-			return calculateColor(newScreenPointRay, x, y)
-		end
 	else
 		r = skyColor.r
 		g = skyColor.g
 		b = skyColor.b
 	end
 
+	-- # reflections and transparent parts
+	local reflectance = 0
+	local opacity = 0
+	local transparency = 0
+	if part then
+
+		reflectance = part.Reflectance
+		if part.Reflectance ~= 0 then
+			local reflect_ray = getReflectedRay(ray.Direction, normal, position)
+			local color = calculateColor(reflect_ray, x, y)
+			reflection_r = color.r
+			reflection_g = color.g
+			reflection_b = color.b
+		end
+
+		opacity = 1-part.Transparency
+		transparency = part.Transparency
+		reflectance *= opacity
+		if part.Transparency ~= 0 then
+			local newScreenPointRay = Ray.new(position - (normal*0.1), ray.Direction * tracer_data.view_distance)
+			local color = calculateColor(newScreenPointRay, x, y)
+			transp_r = color.r
+			transp_g = color.g
+			transp_b = color.b
+		end
+	end
+
 	-- # shading
+	local shadow_r = 1
+	local shadow_g = 1
+	local shadow_b = 1
+	local shadow_average_sample_size = 1
+	local light_strength = 0
+
 	if shading_enabled and part then
-
-		local shadow_r = 0
-		local shadow_g = 0
-		local shadow_b = 0
-		local shadow_average_sample_size = 1
-		local light_strength = 0
-
 		for _ = 1, bounces do
 			for _ = 1,samples do
 
@@ -251,31 +256,15 @@ local function calculateColor(ray: Ray, x, y)
 				end
 			end
 		end
-
-		r *= (shadow_r / shadow_average_sample_size)
-		g *= (shadow_g / shadow_average_sample_size)
-		b *= (shadow_b / shadow_average_sample_size)
-
-		-- TODO: this but transparency
-		local reflection_r = 1
-		local reflection_g = 1
-		local reflection_b = 1
-		local ref = 0
-		if part then
-			ref = part.Reflectance
-			if part.Reflectance ~= 0 then
-				local reflect_ray = getReflectedRay(ray.Direction, normal, position)
-				local color = calculateColor(reflect_ray, x, y)
-				reflection_r = color.r
-				reflection_g = color.g
-				reflection_b = color.b
-			end
-		end
-
-		r *= (((light_strength) / samples) / bounces) + (reflection_r * ref)
-		g *= (((light_strength) / samples) / bounces) + (reflection_g * ref)
-		b *= (((light_strength) / samples) / bounces) + (reflection_b * ref)
 	end
+
+	r *= (shadow_r / shadow_average_sample_size)
+	g *= (shadow_g / shadow_average_sample_size)
+	b *= (shadow_b / shadow_average_sample_size)
+
+	r *= (((light_strength) / samples) / bounces) + (reflection_r * reflectance) + (transp_r * transparency)
+	g *= (((light_strength) / samples) / bounces) + (reflection_g * reflectance) + (transp_g * transparency)
+	b *= (((light_strength) / samples) / bounces) + (reflection_b * reflectance) + (transp_b * transparency)
 
 	-- # fog
 	local distance_to_camera = (position - workspace.Camera.CFrame.Position).Magnitude
@@ -295,17 +284,12 @@ if is_parallel and tonumber(script.Parent.Name) then
 	local Iy = script.Parent.Name
 
 	task.synchronize()
+	local c
 	local line_pixel = ReplicatedStorage.data.pixel:Clone()
 	line_pixel.BackgroundTransparency = 0.1
 	line_pixel.Parent = local_player.PlayerGui.ScreenGui
 
-	local c
-	local Ix = #output_pixels+1
-
-	local function render()
-
-		Ix = #output_pixels+1
-
+	local function render(Ix)
 		if #output_pixels >= Sx then
 			c:Disconnect()
 			return
@@ -313,7 +297,7 @@ if is_parallel and tonumber(script.Parent.Name) then
 
 		-- # picking the given pixel
 		local ray = camera:ScreenPointToRay(Px + Ix, Py + Iy)
-		local actualRay = new_Ray(ray.Origin, ray.Direction * tracer_data.view_distance)
+		local actualRay = Ray.new(ray.Origin, ray.Direction * tracer_data.view_distance)
 
 		-- # adding to the cache and compressing
 		local output = calculateColor(actualRay, Ix, Iy)
@@ -324,21 +308,27 @@ if is_parallel and tonumber(script.Parent.Name) then
 	end
 
 	c = RunService.Heartbeat:ConnectParallel(function()
-		task.synchronize()
 
-		-- # render without causing major lag
-		local end_time = tick()+ms_budget
-		while tick()<end_time do render() end
+		if use_ms_budget then
+			-- # render without causing major lag
+			local end_time = tick()+ms_budget
+			while tick()<end_time do render() end
+		else
+			for Ix = 1, Sx do
+				render(Ix)
+				line_pixel.Size = UDim2.fromOffset(Ix, 1)
+			end
+		end
 
 		line_pixel.Position = UDim2.fromOffset(Px, Py+Iy)
-		line_pixel.Size = UDim2.fromOffset(Ix, 1)
+		line_pixel.Size = UDim2.fromOffset(Sx, 1)
 	end)
 
-	while #output_pixels < Sx do wait() end
+	while #output_pixels < Sx do RunService.Heartbeat:Wait() end
 	c:Disconnect()
 	script.Parent.Parent = ReplicatedStorage
 
-	for i, v in pairs(output_pixels) do
+	for i in pairs(output_pixels) do
 		if i > Sx then
 			output_pixels[i] = nil
 		end
