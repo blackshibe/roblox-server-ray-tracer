@@ -3,7 +3,9 @@
 		"y",
 		"g",
 		"b",
-		"r"
+		"r",
+		"x",
+		"z"
 	],
 	"Lua.diagnostics.globals": [
 		"task"

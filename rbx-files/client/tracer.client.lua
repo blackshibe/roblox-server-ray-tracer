@@ -14,6 +14,7 @@ local is_parallel = script.Parent:IsA("Actor")
 local tracer_data: tracer_data = require(ReplicatedStorage.shared.tracer.data)
 local input_module = require(ReplicatedStorage.shared.tracer.inputs)
 local util = require(ReplicatedStorage.shared.tracer.util)
+local scatter = require(ReplicatedStorage.shared.tracer.scatter_data)
 local bounds
 local log
 local status
@@ -45,7 +46,7 @@ local random = Random.new()
 local target_actors = 100
 local ms_budget = 1/target_actors
 local use_ms_budget = false -- slower but more stable rendering
-local display_shadow_pass = true
+local display_shadow_pass = false
 
 local output_pixels = {}
 local formatted_start_time
@@ -165,6 +166,7 @@ local function calculateColor(ray: Ray, x, y)
 	local position = (result.Position or (ray.Origin+ray.Direction)) + normal*0.01
 	local part = result.Instance
 	local material = result.Material
+	local material_data = scatter[material]
 
 	local r
 	local g
@@ -179,6 +181,7 @@ local function calculateColor(ray: Ray, x, y)
 	local samples = tracer_data.samples
 	local bounces = tracer_data.bounces
 	local shading_enabled = tracer_data.shading_enabled
+	local bloom_enabled = tracer_data.bloom_enabled
 
 	-- # albedo
 	if part then
@@ -236,6 +239,10 @@ local function calculateColor(ray: Ray, x, y)
 			for _ = 1,samples do
 
 				local rot = math.rad(90)
+				if material_data then
+					rot = math.rad(material_data[1])
+				end
+
 				local direction = CFrame.fromOrientation(random:NextNumber(-rot, rot),random:NextNumber(-rot, rot),random:NextNumber(-rot, rot)).LookVector * 100
 
 				local f_result = workspace:Raycast(position, direction, raycast_params) or {}
@@ -261,6 +268,16 @@ local function calculateColor(ray: Ray, x, y)
 	end
 
 	if part then
+
+		local diff_multiply = 0
+		if material_data then
+			diff_multiply = material_data[2](position.x, position.y, position.z)
+		end
+
+		r += diff_multiply
+		g += diff_multiply
+		b += diff_multiply
+
 		r *= (shadow_r / shadow_average_sample_size)
 		g *= (shadow_g / shadow_average_sample_size)
 		b *= (shadow_b / shadow_average_sample_size)
@@ -269,7 +286,6 @@ local function calculateColor(ray: Ray, x, y)
 		g *= (((light_strength) / samples) / bounces) + (reflection_g * reflectance)
 		b *= (((light_strength) / samples) / bounces) + (reflection_b * reflectance)
 	end
-
 
 	-- # fog
 	local distance_to_camera = (position - workspace.Camera.CFrame.Position).Magnitude
@@ -281,10 +297,10 @@ local function calculateColor(ray: Ray, x, y)
 	g = util.lerp(g, tracer_data.fog_color.g, factor)
 	b = util.lerp(b, tracer_data.fog_color.b, factor)
 
+	-- # transparency
 	r = util.lerp(r, transp_r, transparency)
 	g = util.lerp(g, transp_g, transparency)
 	b = util.lerp(b, transp_b, transparency)
-
 
 	if display_shadow_pass then
 		r = (shadow_r / shadow_average_sample_size)
