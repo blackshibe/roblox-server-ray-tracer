@@ -202,6 +202,9 @@ local function calculateColor(ray: Ray, x, y)
 	if part then
 
 		reflectance = part.Reflectance
+		opacity = 1-part.Transparency
+		transparency = part.Transparency
+
 		if part.Reflectance ~= 0 then
 			local reflect_ray = getReflectedRay(ray.Direction, normal, position)
 			local color = calculateColor(reflect_ray, x, y)
@@ -210,8 +213,6 @@ local function calculateColor(ray: Ray, x, y)
 			reflection_b = color.b
 		end
 
-		opacity = 1-part.Transparency
-		transparency = part.Transparency
 		reflectance *= opacity
 		if part.Transparency ~= 0 then
 			local newScreenPointRay = Ray.new(position - (normal*0.1), ray.Direction * tracer_data.view_distance)
@@ -227,7 +228,7 @@ local function calculateColor(ray: Ray, x, y)
 	local shadow_g = 1
 	local shadow_b = 1
 	local shadow_average_sample_size = 1
-	local light_strength = 0
+	local light_strength = 1	
 
 	if shading_enabled and part then
 		for _ = 1, bounces do
@@ -262,9 +263,9 @@ local function calculateColor(ray: Ray, x, y)
 	g *= (shadow_g / shadow_average_sample_size)
 	b *= (shadow_b / shadow_average_sample_size)
 
-	r *= (((light_strength) / samples) / bounces) + (reflection_r * reflectance) + (transp_r * transparency)
-	g *= (((light_strength) / samples) / bounces) + (reflection_g * reflectance) + (transp_g * transparency)
-	b *= (((light_strength) / samples) / bounces) + (reflection_b * reflectance) + (transp_b * transparency)
+	r *= (((light_strength) / samples) / bounces) + (reflection_r * reflectance)
+	g *= (((light_strength) / samples) / bounces) + (reflection_g * reflectance)
+	b *= (((light_strength) / samples) / bounces) + (reflection_b * reflectance)
 
 	-- # fog
 	local distance_to_camera = (position - workspace.Camera.CFrame.Position).Magnitude
@@ -275,6 +276,10 @@ local function calculateColor(ray: Ray, x, y)
 	r = util.lerp(r, tracer_data.fog_color.r, factor)
 	g = util.lerp(g, tracer_data.fog_color.g, factor)
 	b = util.lerp(b, tracer_data.fog_color.b, factor)
+
+	r = util.lerp(r, transp_r, transparency)
+	g = util.lerp(g, transp_g, transparency)
+	b = util.lerp(b, transp_b, transparency)
 
 	return { r = r; g = g; b = b }
 end

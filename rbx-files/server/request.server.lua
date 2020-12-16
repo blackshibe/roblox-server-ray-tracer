@@ -78,8 +78,7 @@ local function receiveRequest(player, fields)
 		end
 	end)
 
-
-
+	wait()
 
 	sending = false
 end
