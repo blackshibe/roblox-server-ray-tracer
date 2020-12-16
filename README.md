@@ -4,10 +4,9 @@ As seen in really bad [youtube videos](https://youtu.be/5IO4AvIuvBk)
 ## "ok but how do i use the serv-"
 https://www.python.org/downloads/, get pip to work, then install dependencies in cmd
 ```
-pip install tkinter
+pip install pillow
 pip install Flask
 pip install httplib2
-python3 -m pip install --upgrade pip
 ```
 **there may be other deps i dont remember**
 
