@@ -42,9 +42,10 @@ local mouse = local_player:GetMouse()
 local random = Random.new()
 
 --> lower to decrease chance of crashes
-local target_actors = 256
+local target_actors = 100
 local ms_budget = 1/target_actors
 local use_ms_budget = false -- slower but more stable rendering
+local display_shadow_pass = true
 
 local output_pixels = {}
 local formatted_start_time
@@ -260,7 +261,6 @@ local function calculateColor(ray: Ray, x, y)
 	end
 
 	if part then
-
 		r *= (shadow_r / shadow_average_sample_size)
 		g *= (shadow_g / shadow_average_sample_size)
 		b *= (shadow_b / shadow_average_sample_size)
@@ -268,8 +268,8 @@ local function calculateColor(ray: Ray, x, y)
 		r *= (((light_strength) / samples) / bounces) + (reflection_r * reflectance)
 		g *= (((light_strength) / samples) / bounces) + (reflection_g * reflectance)
 		b *= (((light_strength) / samples) / bounces) + (reflection_b * reflectance)
-
 	end
+
 
 	-- # fog
 	local distance_to_camera = (position - workspace.Camera.CFrame.Position).Magnitude
@@ -284,6 +284,13 @@ local function calculateColor(ray: Ray, x, y)
 	r = util.lerp(r, transp_r, transparency)
 	g = util.lerp(g, transp_g, transparency)
 	b = util.lerp(b, transp_b, transparency)
+
+
+	if display_shadow_pass then
+		r = (shadow_r / shadow_average_sample_size)
+		g = (shadow_g / shadow_average_sample_size)
+		b = (shadow_b / shadow_average_sample_size)
+	end
 
 	return { r = r; g = g; b = b }
 end
