@@ -5,9 +5,9 @@ As seen in really bad [youtube videos](https://youtu.be/5IO4AvIuvBk)
 https://www.python.org/downloads/, get pip to work, then install dependencies in cmd
 ```
 pip install tkinter
-pip install flask
+pip install Flask
 pip install httplib2
-pip install pil
+python3 -m pip install --upgrade pip
 ```
 **there may be other deps i dont remember**
 
