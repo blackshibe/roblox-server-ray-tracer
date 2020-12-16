@@ -11,7 +11,7 @@ pip install pil
 ```
 **there may be other deps i dont remember**
 
-## to use:
+## "ok but how to render"
 - use the experimental [parallel lua studio build](https://devforum.roblox.com/t/parallel-luau-developer-preview/925304)
 - follow [this video](https://youtu.be/pv5-0z3wCXM)
 (the key pressed at 0:30 is E)
