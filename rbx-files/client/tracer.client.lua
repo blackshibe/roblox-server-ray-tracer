@@ -228,7 +228,7 @@ local function calculateColor(ray: Ray, x, y)
 	local shadow_g = 1
 	local shadow_b = 1
 	local shadow_average_sample_size = 1
-	local light_strength = 1	
+	local light_strength = 1
 
 	if shading_enabled and part then
 		for _ = 1, bounces do
@@ -259,13 +259,17 @@ local function calculateColor(ray: Ray, x, y)
 		end
 	end
 
-	r *= (shadow_r / shadow_average_sample_size)
-	g *= (shadow_g / shadow_average_sample_size)
-	b *= (shadow_b / shadow_average_sample_size)
+	if part then
 
-	r *= (((light_strength) / samples) / bounces) + (reflection_r * reflectance)
-	g *= (((light_strength) / samples) / bounces) + (reflection_g * reflectance)
-	b *= (((light_strength) / samples) / bounces) + (reflection_b * reflectance)
+		r *= (shadow_r / shadow_average_sample_size)
+		g *= (shadow_g / shadow_average_sample_size)
+		b *= (shadow_b / shadow_average_sample_size)
+
+		r *= (((light_strength) / samples) / bounces) + (reflection_r * reflectance)
+		g *= (((light_strength) / samples) / bounces) + (reflection_g * reflectance)
+		b *= (((light_strength) / samples) / bounces) + (reflection_b * reflectance)
+
+	end
 
 	-- # fog
 	local distance_to_camera = (position - workspace.Camera.CFrame.Position).Magnitude
