@@ -1,4 +1,5 @@
 # roblox-server-ray-tracer
+## untested, may be extremely broken due to changes to the thread safety api
 As seen in really bad [youtube videos](https://youtu.be/5IO4AvIuvBk)
 
 ## "ok but how do i use the serv-"
