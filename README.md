@@ -1,17 +1,16 @@
 # roblox-server-ray-tracer
 ## untested, may be extremely broken due to changes to the thread safety api
-As seen in really bad [youtube videos](https://youtu.be/5IO4AvIuvBk)
+As seen in [a youtube video](https://youtu.be/5IO4AvIuvBk)
 
-## "ok but how do i use the serv-"
+## How to install
 https://www.python.org/downloads/, get pip to work, then install dependencies in cmd
 ```
 pip install pillow
 pip install Flask
 pip install httplib2
 ```
-**there may be other deps i dont remember**
 
-## "ok but how to render"
+## How to render
 - use the experimental [parallel lua studio build](https://devforum.roblox.com/t/parallel-luau-developer-preview/925304)
 - follow [this video](https://youtu.be/pv5-0z3wCXM)
 (the key pressed at 0:30 is E)
